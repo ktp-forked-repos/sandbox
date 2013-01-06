@@ -1,0 +1,46 @@
+#!/bin/bash
+#
+
+export BASE_DIR="/home/jdavison/infosec"
+
+case "$1" in 
+start)
+	echo "creating network malware0"
+	sudo brctl addbr malware0
+	sudo ifconfig malware0 172.19.0.1 netmask 255.255.255.0
+	
+	# turn on the internets
+	sudo bash -c "echo 1 > /proc/sys/net/ipv4/ip_forward"
+	sudo iptables -t nat -A POSTROUTING -s 172.19.0.0/24 -j MASQUERADE
+
+	# block everything
+	sudo $BASE_DIR/bin/block_all
+
+	# start dhcp server on malware0
+	sudo /usr/sbin/dnsmasq -h --addn-hosts=$BASE_DIR/custom_dns.conf --interface=malware0 --dhcp-range=interface:malware0,172.19.0.30,172.19.0.254
+
+    echo "creating network win2k3"
+    sudo brctl addbr win2k3
+    sudo ifconfig win2k3 172.19.1.1 netmask 255.255.255.0
+
+    sudo iptables -A INPUT -i win2k3 -s 172.19.1.0/24 -j ACCEPT
+    sudo iptables -A INPUT -i win2k3 -j DROP
+    sudo iptables -A OUTPUT -o win2k3 -s 172.19.1.0/24 -j ACCEPT
+    sudo iptables -A OUTPUT -o win2k3 -j DROP
+    ;;
+
+stop)
+    echo "stopping malware0"
+    sudo kill -TERM `cat /var/run/dnsmasq.pid` # dangerous
+	sudo iptables -t nat -F POSTROUTING
+    sudo iptables -F INPUT
+    sudo iptables -F OUTPUT
+	sudo bash -c "echo 0 > /proc/sys/net/ipv4/ip_forward"
+    sudo ifconfig malware0 down
+    sudo brctl delbr malware0
+    
+    echo "stopping win2k3"
+    sudo ifconfig win2k3 down
+    sudo brctl delbr win2k3
+    ;;
+esac
