@@ -1,0 +1,14 @@
+#!/bin/bash
+#
+# starts the given virtual machine and reports the RDP port to connect to
+#
+# 8/7/2010 - created
+
+cmd='VBoxManage -q'
+vm="$1"
+
+# make sure it's running
+if $cmd showvminfo "$vm" | grep '^State:'|grep 'running (' > /dev/null
+then
+    $cmd controlvm "$vm" poweroff
+fi

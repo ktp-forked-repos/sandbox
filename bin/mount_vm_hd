@@ -1,0 +1,26 @@
+#!/bin/bash
+#
+# mount the given vm hard drive r/o for analysis
+#
+# created 1/27/2011 by John Davison
+
+BASE_DIR="/home/jdavison/infosec"
+src="$1"
+vm="VBoxManage -q"
+
+if [ -f "$BASE_DIR/filesystem/$src.vdi" ]
+then
+    echo "deleting old vdi file: $src.vdi"
+    rm "$BASE_DIR/filesystem/$src.vdi"
+fi
+
+# get the uuid of the hard drives
+src_uuid=$($vm showvminfo $src|grep "^IDE Controller (0, 0"|sed -e 's/.*UUID: \([0-9a-z-]*\).*/\1/')
+echo "src_uuid = $src_uuid"
+echo "preparing fs..."
+$vm clonehd $src_uuid "$BASE_DIR/filesystem/$src.vdi" --variant Fixed 
+# find the offset
+src_offset=$($vm internalcommands dumphdinfo "$BASE_DIR/filesystem/$src.vdi" | grep 'offData=' | sed -e 's/.* offData=\([0-9]*\).*/\1/')
+echo $src_offset
+mkdir -p "$BASE_DIR/filesystem/$src-mnt"
+sudo /bin/mount -t ntfs -o ro,noatime,noexec,loop,offset=$((src_offset + 32256)),uid=1000,gid=100 "$BASE_DIR/filesystem/$src.vdi" "$BASE_DIR/filesystem/$src-mnt"

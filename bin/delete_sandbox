@@ -1,0 +1,47 @@
+#!/bin/bash
+# 
+# deletes the given virtual machine and all of it's hard drives
+# 
+# 8/7/2010 - created
+
+if [ -z "$SANDBOX" ]
+then
+    echo "missing \$SANDBOX environment variable"
+    exit 1
+fi
+
+vm_cmd='VBoxManage -q'
+vm="$1"
+
+echo -n "Are you sure you want to delete vm $1? (Y/n) "
+read yn
+
+if [ "$yn" != "Y" ]
+then
+    exit
+fi
+
+$SANDBOX/bin/stop_sandbox "$vm"
+
+# delete any trace files
+if [ -s "$SANDBOX/traces/$vm.pcap" ]
+then
+    echo "deleting trace file $SANDBOX/traces/$vm.pcap"
+    rm "$SANDBOX/traces/$vm.pcap"
+fi
+
+# delete any snapshots
+$vm_cmd showvminfo "$vm" | sed -n '/^Snapshots:/, $ p' | grep UUID | sed -e 's/.*UUID: \([0-9a-z-]*\)).*/\1/' | while read UUID
+do
+    echo "deleting snapshot $UUID"
+    $vm_cmd snapshot "$vm" delete "$UUID"
+done
+
+# delete the vm
+$vm_cmd unregistervm "$vm" --delete
+
+if [ -d "$SANDBOX/shared/$vm" ]
+then
+    echo "deleting $SANDBOX/shared/$vm"
+    rm -rf "$SANDBOX/shared/$vm"
+fi

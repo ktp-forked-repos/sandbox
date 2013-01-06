@@ -1,0 +1,10 @@
+#!/bin/bash
+#
+# starts the given virtual machine and reports the RDP port to connect to
+#
+# 8/7/2010 - created
+
+vm_cmd='VBoxManage -q'
+vm="$1"
+
+${vm_cmd} startvm "${vm}"
