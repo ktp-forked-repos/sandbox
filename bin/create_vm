@@ -6,7 +6,7 @@
 vm_cmd='VBoxManage -q'
 
 ${vm_cmd} createvm --name "$1" --ostype WindowsXP --register
-${vm_cmd} modifyvm "$1" --memory 1024 --boot1 dvd --boot2 disk --nic1 nat --vrdp on --vrdpport 40000-40010 --vrdpauthtype null
+${vm_cmd} modifyvm "$1" --memory 512 --boot1 dvd --boot2 disk --nic1 nat --vrdp on --vrdpport 40000-40010 --vrdpauthtype null
 ${vm_cmd} createhd --filename "`pwd`/hdds/$1.vdi" --size 9216
 ${vm_cmd} storagectl "$1" --name ide --add ide
 ${vm_cmd} storageattach "$1" --storagectl ide --port 0 --device 0 --type dvddrive --medium $2
