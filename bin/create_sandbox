@@ -9,8 +9,8 @@ import logging
 logging.basicConfig(level=logging.DEBUG)
 
 parser = argparse.ArgumentParser(description="Create a new VM based on another VM.")
-parser.add_argument('source_vm', nargs="1", action='store', help="Source VM to copy.")
-parser.add_argument('dest_vm', nargs="1", action = 'store', help="Dest VM name.")
+parser.add_argument('source_vm', action='store', help="Source VM to copy.")
+parser.add_argument('dest_vm', action = 'store', help="Dest VM name.")
 parser.add_argument('-s', '--snapshot', action='store', required=False, default='ready', dest='snapshot',
     help="The snapshot from the source_vm to use when cloning.")
 

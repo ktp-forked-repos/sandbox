@@ -4,6 +4,7 @@
 import os
 import logging
 from subprocess import Popen, PIPE
+import re
 
 # globals
 global_config = None
@@ -12,6 +13,11 @@ base_directory = None
 # local constants
 _SANDBOX_HOME = 'SANDBOX_HOME'
 VBOX = 'VBoxManage -q'
+
+def _vbox(*args):
+    r = [ 'VBoxManage', '-q' ]
+    r.extend(args)
+    return r
 
 def initialize():
     global base_directory
@@ -30,6 +36,11 @@ def create_sandbox(source_vm, dest_vm, snapshot=None):
     assert snapshot is not None
     assert snapshot != ''
 
+    # make sure the trace directory exists
+    if not os.path.exists(os.path.join(base_directory, 'traces')):
+        logging.fatal("trace directory does not exist")
+        return False
+
     if not clone_vm(source_vm, dest_vm, snapshot):
         logging.error("clone_vm failed")
         return False
@@ -44,7 +55,7 @@ def create_sandbox(source_vm, dest_vm, snapshot=None):
                 trace_file, str(e)))
 
     # TODO check to see what state the source VM was in
-    if not modify_vm(trace_file=trace_file):
+    if not modify_vm(dest_vm, trace_file=trace_file):
         logging.error("modify_vm failed")
         return False
 
@@ -58,9 +69,10 @@ def create_sandbox(source_vm, dest_vm, snapshot=None):
             logging.error("unable to create dir {0}: {1}".format(
                 shared_path, str(e)))
 
-    if not remove_shared_folder(dest_vm, 'shared'):
-        logging.error("unable to remove shared folder")
-        return False
+    if has_shared_folder(dest_vm, 'shared'):
+        if not remove_shared_folder(dest_vm, 'shared'):
+            logging.error("unable to remove shared folder")
+            return False
 
     if not add_shared_folder(dest_vm, 'shared', shared_path):
         logging.error("unable to add shared folder")
@@ -79,7 +91,7 @@ def vm_exists(vm):
     return returncode == 0
 
 def show_vm_info(vm):
-    p = Popen([VBOX, 'showvminfo', vm], stdout=PIPE)
+    p = Popen(_vbox('showvminfo', vm), stdout=PIPE, stderr=PIPE)
     (stdout, stderr) = p.communicate()
     return (stdout, stderr, p.returncode)
 
@@ -91,13 +103,13 @@ def clone_vm(source_vm, dest_vm, snapshot=None):
     assert snapshot is not None
     assert snapshot != ''
 
-    p = Popen([VBOX, 'clonevm', 
+    p = Popen(_vbox('clonevm', 
         source_vm, 
         '--snapshot', snapshot, 
         '--mode', 'machine',
         '--options', 'link',
         '--name', dest_vm,
-        '--register'])
+        '--register'))
     p.wait()
 
     return p.returncode == 0
@@ -106,7 +118,7 @@ def modify_vm(vm, trace_file=None):
     assert vm is not None
     assert vm != ''
     
-    args = [ VBOX, 'modifyvm', vm ]
+    args = _vbox('modifyvm', vm)
     if trace_file is not None:
         args.extend(['--nictrace1', 'on',  '--nictracefile1', trace_file])
     
@@ -119,13 +131,28 @@ def modify_vm(vm, trace_file=None):
     
     return p.returncode == 0
 
+def has_shared_folder(vm, name):
+    assert vm is not None
+    assert vm != ''
+    assert name is not None 
+    assert name != ''
+
+    (stdout, stderr, result) = show_vm_info(vm)
+    for line in stdout:
+        m = re.search(r"Name: '([^']+)', Host path:", line)
+        if m:
+            if m.group(1) == name:
+                return True
+
+    return False
+
 def remove_shared_folder(vm, name):
     assert vm is not None
     assert vm != ''
     assert name is not None 
     assert name != ''
 
-    p = Popen([VBOX, 'sharedfolder', vm, 'remove', name])
+    p = Popen(_vbox('sharedfolder', 'remove', vm, '--name', name))
     p.wait()
 
     return p.returncode == 0
@@ -137,8 +164,9 @@ def add_shared_folder(vm, name, path):
     assert name != ''
     assert path is not None 
     assert path != ''
+    assert os.path.isabs(path)
 
-    p = Popen([VBOX, 'sharedfolder', vm, 'add', name, path])
+    p = Popen(_vbox('sharedfolder', 'add', vm, '--name', name, '--hostpath', path))
     p.wait()
 
     return p.returncode == 0
